@@ -1,12 +1,12 @@
-export function parallex(options = {}) {
+
+export const Parallex = function(options = {}) {
 
   // Set default options
   options.rootElement = options.rootElement;
   options.selector = options.selector || '[data-parallex]';
   options.trigger = options.trigger || 'scroll';
-  options.activeClass = options.activeClass || 'parallex-active';
+  options.activeClass = 'parallex-active';
   options.freezeClass = 'parallex-freeze'; // disables updates to element transform styles
-  options.inertClass = 'parallex-inert'; // completey disables any calculations for positioning + any updates to element transform styles
   options.cssTransitionStyle = options.cssTransitionStyle || false;
   options.speed = options.speed || 5;
   options.autoScrollSpeed = options.autoScrollSpeed || 1;
@@ -16,8 +16,7 @@ export function parallex(options = {}) {
 
   const _ = undefined;
   let isInitialised = false;
-  let dirty = false;
-  let parallaxElements;
+  let parallexElements;
   let cachedScrollPosition = 0;
   let scrollDirection;
   let rootElementResizeObserver;
@@ -31,7 +30,6 @@ export function parallex(options = {}) {
     init: 'init',
     destroy: 'destroy',
     scroll: 'scroll',
-    mousemove: 'mouse-move',
     controls: 'controls',
     reset: 'reset',
   };
@@ -44,11 +42,7 @@ export function parallex(options = {}) {
   // This happens when activating parallax only if the element is in the viewport (by adding 
   // 'parallax-active' class at a determined threshold - not handled by parallax code).
   const offset = [];
-  // When trigger is set to 'mouse-move' check if each element has a CSS transition and cache it on init.
-  // This should only run on init as getComputedStyle is a very expensive operation. This is used to determine
-  // the inital x y offsets of the element before applying transforms, 
-  const hasCssTransition = [];
- 
+
   let supportsPassiveEvents = false;
 
   try {
@@ -60,6 +54,16 @@ export function parallex(options = {}) {
     window.addEventListener('testPassive', null, opts);
     window.removeEventListener('testPassive', null, opts);
   } catch (e) {}
+
+  // Check which requestAnimationFrame to use. 
+  // If none supported - use the onscroll event
+  const tick = window.requestAnimationFrame ||
+  window.webkitRequestAnimationFrame ||
+  window.mozRequestAnimationFrame ||
+  window.msRequestAnimationFrame ||
+  window.oRequestAnimationFrame ||
+  function(callback) { return window.setTimeout(callback, 1000 / 60); 
+  };
 
   function getBreakpoint() {
     if (!options.breakpoints) return false;
@@ -86,7 +90,7 @@ export function parallex(options = {}) {
     cachedScrollPosition = window.scrollY;
   };
 
-  function run(elements, trigger, event) {
+  function run(elements, trigger) {
    
     setScrollDirection();
 
@@ -94,10 +98,10 @@ export function parallex(options = {}) {
 
       const rect = element.getBoundingClientRect();
       const isActive = element.classList.contains(options.activeClass);
-      const isInert = element.classList.contains(options.inertClass);
       let isFrozen = element.classList.contains(options.freezeClass);
       const elementStyle = element.style;
-      const constraint = element.dataset.parallaxConstraint || 10000;
+      const constraint = element.dataset.parallexConstraint || 10000;
+      const explicitlyActivate = element.dataset.parallexExplicitlyActivate || false;
 
       if (trigger === TRIGGERS.destroy) {
         element.style.removeProperty('transform');
@@ -117,42 +121,16 @@ export function parallex(options = {}) {
           if (element.dataset[`parallexSpeed${breakpointCapitalized}`]) {
             speed[index] = options.trigger === TRIGGERS.scroll ? 
               -(element.dataset[`parallexSpeed${breakpointCapitalized}`]/10) : 
-              element.dataset.parallaxSpeed || options.speed
+              element.dataset.parallexSpeed || options.speed
           } else {
             speed[index] = options.trigger === TRIGGERS.scroll ? 
-              -((element.dataset.parallaxSpeed || options.speed)/10) :
-              element.dataset.parallaxSpeed || options.speed
+              -((element.dataset.parallexSpeed || options.speed)/10) :
+              element.dataset.parallexSpeed || options.speed
           }
         } else {
           speed[index] = options.trigger === TRIGGERS.scroll ? 
-            -((element.dataset.parallaxSpeed || options.speed)/10) :
-            element.dataset.parallaxSpeed || options.speed
-        }
-
-        if (options.trigger === TRIGGERS.mousemove)  {
-         
-          offset[index] = [rect.x, rect.y];  // cache inital x, y values for base for calculating transform amount
-          
-          // reset inital positions when resesing
-          if (trigger === TRIGGERS.reset && dirty) {
-            (options.rootElement || window).removeEventListener('mousemove', runInsideRAF); // remove this to prevent interactions while resizing
-            element.addEventListener('transitionend', reset, { once: true }); 
-            elementStyle.transform = getTransformStyle(); 
-
-            if (!hasCssTransition[index]) {
-              reset();
-            }
-
-            function reset() {
-              setTimeout(() => {
-                const rect = element.getBoundingClientRect();
-                offset[index] = [rect.x, rect.y];
-                element.removeEventListener('transitionend', reset, { once: true });
-                (options.rootElement || window).addEventListener('mousemove', runInsideRAF);
-                dirty = false;
-              }, 0);
-            }
-          }
+            -((element.dataset.parallexSpeed || options.speed)/10) :
+            element.dataset.parallexSpeed || options.speed
         }
       }
 
@@ -173,31 +151,27 @@ export function parallex(options = {}) {
             elementStyle.transform = getTransformStyle();  
           } 
         }
-
-        if (options.trigger === TRIGGERS.mousemove) {
-          hasCssTransition[index] = options.cssTransitionStyle ? true : window.getComputedStyle(element, null).getPropertyValue('transition') !== 'all 0s ease 0s';
-        }
       }
 
       ////////// SCROLL ACTIONS ///////////////
       /////////////////////////////////////////
       if (options.trigger === TRIGGERS.scroll) {
 
-        if (!isFrozen && !isInert) {
+        if (!isFrozen) {
 
           const offsetAmount = window.scrollY * speed[index];
 
           // If item is active (has active class) or is in the viewport or above the viewport.
           // Dont pause parallax when it is above viewport even if inactive as it needs to 
           // retain its offset in order to renter the viewport at the correct position.
-          if (isActive || rect.bottom < window.innerHeight) {
+          if ((explicitlyActivate && isActive) || (!explicitlyActivate && rect.top < window.innerHeight)) {
             const transformAmount = offsetAmount - offset[index];
 
             if (Math.abs(transformAmount) <= constraint) {
               elementStyle.transform = getTransformStyle(undefined, transformAmount); 
             }
           } 
-          else if (!isActive) {
+          else {
             // Reset any transfrom that is scrolled out of view below the viewport.
             // Keep track of the offsetAmount when not active.
             offset[index] = offsetAmount;
@@ -227,7 +201,7 @@ export function parallex(options = {}) {
       ////////////////////////////////////////////////////
       if (options.trigger === TRIGGERS.controls) {
 
-        if (!isFrozen && !isInert) {
+        if (!isFrozen) {
           const offsetAmount = controlledState.autoScrollOffset * speed[index];
 
           if (isActive) {
@@ -238,89 +212,15 @@ export function parallex(options = {}) {
         }
       }
 
-      ////////// MOUSE MOVE ACTIONS ///////////
-      /////////////////////////////////////////
-      else if (options.trigger === TRIGGERS.mousemove && event && isActive) {
-
-        dirty = true;
-        const offsetAmount = Math.abs(speed[index]);
-        const { movementX, movementY } = event;
-        const base = {
-          x: rect.x - offset[index][0],
-          y: rect.y - offset[index][1],
-        };
-        const getTransformValue = (axis, operation) => {
-          if (!operation) return base[axis];
-          const transformValue = operation === 'add' ? base[axis] + offsetAmount : base[axis] - offsetAmount;
-          return Math.abs(transformValue) <= constraint ? transformValue : base[axis];
-        };
-
-        if (movementX > 0 && movementY > 0) {
-          // direction - down-right //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x', 'add'), 
-            getTransformValue('y', 'add')
-          ); 
-        } 
-        else if (movementX < 0 && movementY > 0) {
-          //  direction - down-left //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x', 'subtract'), 
-            getTransformValue('y', 'add')
-          ); 
-        } 
-        else if (movementX > 0 && movementY < 0) {
-          //  direction - up-right //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x', 'add'), 
-            getTransformValue('y', 'subtract')
-          ); 
-        } 
-        else if (movementX < 0 && movementY < 0) {
-          // direction - up-left //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x', 'subtract'), 
-            getTransformValue('y', 'subtract')
-          );
-        } 
-        else if (movementX == 0 && movementY > 0) {
-          // direction - down //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x'), 
-            getTransformValue('y', 'add')
-          );
-        } 
-        else if (movementX == 0 && movementY < 0) {
-          // direction - up //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x'), 
-            getTransformValue('y', 'subtract')
-          );
-        } 
-        else if (movementX > 0 && movementY == 0) {
-          // direction - right //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x', 'add'), 
-            getTransformValue('y')
-          );
-        } 
-        else if (movementX < 0 && movementY == 0) {
-          // direction - left //
-          elementStyle.transform = getTransformStyle(
-            getTransformValue('x', 'subtract'), 
-            getTransformValue('y')
-          );
-        }
-      }
     })
   };
 
   function runInsideRAF(event, trigger) {
-    tick(() => { run(parallaxElements, trigger, event) });
+    tick(() => { run(parallexElements, trigger) });
   };
 
   function runRAFLoop() {
-    run(parallaxElements);
+    run(parallexElements);
     controlledState.autoScrollOffset = controlledState.autoScrollOffset + options.autoScrollSpeed/100;
     if (controlledState.playing) {
       tick(runRAFLoop);
@@ -342,24 +242,16 @@ export function parallex(options = {}) {
   };
   
   function init(hasResizeEventListener=false) {
-    parallaxElements = (options.rootElement || document).querySelectorAll(options.selector);
+    parallexElements = (options.rootElement || document).querySelectorAll(options.selector);
 
-    if (parallaxElements?.length) {
+    if (parallexElements?.length) {
       if (window.innerWidth > options.minActiveBreakpoint) {
 
-        run(parallaxElements, TRIGGERS.init);
+        run(parallexElements, TRIGGERS.init);
 
         if (options.trigger === TRIGGERS.scroll) {
           window.addEventListener('scroll', runInsideRAF, supportsPassiveEvents ? { passive: true } : false);
         }
-        else if (options.trigger === TRIGGERS.mousemove) {
-          (options.rootElement || window).addEventListener('mousemove', runInsideRAF);
-          window.addEventListener('scroll', reEvaluate);
-
-          if (options.rootElement) {
-            options.rootElement.addEventListener('scroll', reEvaluate);
-          }
-        } 
         else if (options.trigger === TRIGGERS.controls) {
           if (controlledState.playing) {
             runRAFLoop();
@@ -410,11 +302,11 @@ export function parallex(options = {}) {
       else if (options.scrollRestoration === 'smoothScroll') {
         window.onunload = function() { 
           const scrollPosition = window.scrollY;
-          window.sessionStorage.setItem('parallaxPreviousScroll', scrollPosition);
+          window.sessionStorage.setItem('parallexPreviousScroll', scrollPosition);
           window.scrollTo(0,0);
         }
 
-        let previousScrollPosition = window.sessionStorage.getItem('parallaxPreviousScroll');
+        let previousScrollPosition = window.sessionStorage.getItem('parallexPreviousScroll');
 
         if (previousScrollPosition) {
 
@@ -436,7 +328,7 @@ export function parallex(options = {}) {
               top: parseInt(previousScrollPosition),
               behavior: 'smooth'
             });
-            window.sessionStorage.removeItem('parallaxPreviousScroll');
+            window.sessionStorage.removeItem('parallexPreviousScroll');
           }, 0);
         }
       } 
@@ -444,7 +336,7 @@ export function parallex(options = {}) {
   };
 
   function destroy(retainResizeEventListener=false) {
-    if (parallaxElements && parallaxElements.length > 0) {
+    if (parallexElements && parallexElements.length > 0) {
       window.removeEventListener('scroll', runInsideRAF);
       window.removeEventListener('scroll', reEvaluate);
 
@@ -462,8 +354,7 @@ export function parallex(options = {}) {
         options.rootElement.removeEventListener('scroll', reEvaluate);
       }
 
-      (options.rootElement || window).removeEventListener('mousemove', runInsideRAF);
-      run(parallaxElements, TRIGGERS.destroy);
+      run(parallexElements, TRIGGERS.destroy);
       isInitialised = false;
     }
   };
@@ -492,12 +383,7 @@ export function parallex(options = {}) {
   };
 };
 
-// Check which requestAnimationFrame to use. 
-// If none supported - use the onscroll event
-const tick = window.requestAnimationFrame ||
-    window.webkitRequestAnimationFrame ||
-    window.mozRequestAnimationFrame ||
-    window.msRequestAnimationFrame ||
-    window.oRequestAnimationFrame ||
-    function(callback) { return window.setTimeout(callback, 1000 / 60); 
-};
+
+
+
+
