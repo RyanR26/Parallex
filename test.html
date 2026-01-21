@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parallex Test Page</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      overflow-x: hidden;
+    }
+
+    .hero {
+      position: relative;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .hero-bg {
+      position: absolute;
+      top: -20%;
+      left: -10%;
+      width: 120%;
+      height: 140%;
+      background: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=1200&fit=crop') center/cover;
+      z-index: 1;
+      opacity: 0.3;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 3;
+      text-align: center;
+      color: white;
+      padding: 2rem;
+    }
+
+    .hero h1 {
+      font-size: 4rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .hero p {
+      font-size: 1.5rem;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .section {
+      min-height: 100vh;
+      padding: 4rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .section:nth-child(even) {
+      background: #f8f9fa;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .content-block {
+      margin: 4rem 0;
+      position: relative;
+    }
+
+    .image-wrapper {
+      position: relative;
+      margin: 2rem 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    .image-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    h2 {
+      font-size: 3rem;
+      margin-bottom: 1.5rem;
+      color: #2d3748;
+    }
+
+    h3 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #4a5568;
+    }
+
+    p {
+      font-size: 1.125rem;
+      margin-bottom: 1rem;
+      color: #718096;
+      max-width: 800px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin: 3rem 0;
+    }
+
+    .card {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+    }
+
+    .floating-element {
+      position: absolute;
+      opacity: 0.1;
+      pointer-events: none;
+    }
+
+    .circle {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .square {
+      width: 150px;
+      height: 150px;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      border-radius: 20px;
+    }
+
+    footer {
+      background: #2d3748;
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-bg" data-parallex data-parallex-speed="3"></div>
+    <div class="hero-content" data-parallex data-parallex-speed="6">
+      <h1>Parallex Test Page</h1>
+      <p>Scroll down to see the parallax effects in action</p>
+    </div>
+  </section>
+
+  <!-- Section 1: Multi-layer Parallax -->
+  <section class="section">
+    <div class="container">
+      <div class="content-block" data-parallex data-parallex-speed="4">
+        <h2>Multi-Layer Parallax Effects</h2>
+        <p>This section demonstrates different parallax speeds on various elements. Notice how each element moves at a different rate as you scroll.</p>
+      </div>
+
+      <div class="image-wrapper" data-parallex data-parallex-speed="7">
+        <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&h=800&fit=crop" alt="Mountain landscape">
+      </div>
+
+      <div class="content-block" data-parallex data-parallex-speed="5">
+        <h3>Varying Speeds</h3>
+        <p>Each element has a different data-parallex-speed attribute, creating depth and dimension. Higher values create faster movement.</p>
+      </div>
+
+      <div class="floating-element circle" data-parallex data-parallex-speed="2" style="top: 10%; right: 5%;"></div>
+      <div class="floating-element square" data-parallex data-parallex-speed="8" style="bottom: 20%; left: 10%;"></div>
+    </div>
+  </section>
+
+  <!-- Section 2: Image Grid -->
+  <section class="section">
+    <div class="container">
+      <div class="content-block" data-parallex data-parallex-speed="4">
+        <h2>Image Grid with Parallax</h2>
+        <p>Multiple images with different parallax speeds create an engaging visual experience.</p>
+      </div>
+
+      <div class="grid">
+        <div class="image-wrapper" data-parallex data-parallex-speed="5">
+          <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&h=800&fit=crop" alt="Mountain peak">
+        </div>
+        <div class="image-wrapper" data-parallex data-parallex-speed="7">
+          <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&h=800&fit=crop" alt="Mountain range">
+        </div>
+        <div class="image-wrapper" data-parallex data-parallex-speed="6">
+          <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=600&h=800&fit=crop" alt="Mountain vista">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Text Content -->
+  <section class="section">
+    <div class="container">
+      <div class="content-block" data-parallex data-parallex-speed="3">
+        <h2>Parallax on Text Elements</h2>
+        <p>Text elements can also have parallax effects applied, creating dynamic typography experiences.</p>
+      </div>
+
+      <div class="grid">
+        <div class="card" data-parallex data-parallex-speed="4">
+          <h3>Feature One</h3>
+          <p>Performance optimized using requestAnimationFrame for smooth 60fps animations.</p>
+        </div>
+        <div class="card" data-parallex data-parallex-speed="6">
+          <h3>Feature Two</h3>
+          <p>Responsive breakpoints allow different speeds for mobile, tablet, and desktop.</p>
+        </div>
+        <div class="card" data-parallex data-parallex-speed="5">
+          <h3>Feature Three</h3>
+          <p>Smart viewport detection ensures effects only run when elements are visible.</p>
+        </div>
+      </div>
+
+      <div class="floating-element circle" data-parallex data-parallex-speed="9" style="top: 30%; left: 5%;"></div>
+    </div>
+  </section>
+
+  <!-- Section 4: Constrained Movement -->
+  <section class="section">
+    <div class="container">
+      <div class="content-block" data-parallex data-parallex-speed="4">
+        <h2>Constrained Parallax</h2>
+        <p>Use data-parallex-constraint to limit the maximum movement distance.</p>
+      </div>
+
+      <div class="image-wrapper" data-parallex data-parallex-speed="10" data-parallex-constraint="300">
+        <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=600&fit=crop" alt="Constrained parallax">
+      </div>
+
+      <div class="content-block" data-parallex data-parallex-speed="5">
+        <p>This image has a high speed (10) but is constrained to 300px maximum movement, preventing excessive displacement.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 5: Large Image -->
+  <section class="section">
+    <div class="container">
+      <div class="image-wrapper" data-parallex data-parallex-speed="8">
+        <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1600&h=900&fit=crop" alt="Wide landscape">
+      </div>
+
+      <div class="content-block" data-parallex data-parallex-speed="4">
+        <h2>Full-Width Imagery</h2>
+        <p>Large images create dramatic parallax effects that draw the eye and create immersive experiences.</p>
+      </div>
+
+      <div class="floating-element square" data-parallex data-parallex-speed="3" style="top: 50%; right: 10%;"></div>
+    </div>
+  </section>
+
+  <!-- Section 6: Mixed Content -->
+  <section class="section">
+    <div class="container">
+      <div class="content-block" data-parallex data-parallex-speed="5">
+        <h2>Mixed Content Parallax</h2>
+        <p>Combine text, images, and decorative elements for rich, layered designs.</p>
+      </div>
+
+      <div style="display: flex; gap: 2rem; align-items: center; margin: 3rem 0;">
+        <div style="flex: 1;" data-parallex data-parallex-speed="4">
+          <h3>About This Demo</h3>
+          <p>This test page demonstrates various parallax techniques including multi-layer effects, constrained movement, and responsive behavior.</p>
+          <p>Each section showcases different use cases and configuration options available in the Parallex library.</p>
+        </div>
+        <div style="flex: 1;" class="image-wrapper" data-parallex data-parallex-speed="7">
+          <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=800&h=600&fit=crop" alt="Side image">
+        </div>
+      </div>
+
+      <div class="floating-element circle" data-parallex data-parallex-speed="6" style="bottom: 10%; left: 15%;"></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <h3 data-parallex data-parallex-speed="3">Parallex Library</h3>
+      <p data-parallex data-parallex-speed="4">A lightweight, performant JavaScript library for parallax scrolling effects</p>
+      <p style="margin-top: 2rem; opacity: 0.7;">© 2023 Ryan Rudman</p>
+    </div>
+  </footer>
+
+  <!-- Initialize Parallex -->
+  <script type="module">
+    import { Parallex } from './parallex.js';
+
+    const parallax = Parallex({
+      selector: '[data-parallex]',
+      speed: 5,
+      trigger: 'scroll',
+      scrollRestoration: 'browser',
+      breakpoints: {
+        mobile: 0,
+        tablet: 768,
+        desktop: 1024
+      }
+    });
+
+    parallax.init();
+
+    // Log initialization
+    console.log('Parallex initialized!');
+  </script>
+
+

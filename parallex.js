@@ -13,6 +13,7 @@ export const Parallex = function(options = {}) {
   options.minActiveBreakpoint = options.minActiveBreakpoint || 0;
   options.breakpoints = options.breakpoints || false;
   options.scrollRestoration = options.scrollRestoration || 'browser'; // options: browser, smoothScroll, disable
+  options.useIntersectionObserver = options.useIntersectionObserver !== false; // default true
 
   const _ = undefined;
   let isInitialised = false;
@@ -20,6 +21,11 @@ export const Parallex = function(options = {}) {
   let cachedScrollPosition = 0;
   let scrollDirection;
   let rootElementResizeObserver;
+  let intersectionObserver;
+
+  // Cache window dimensions to avoid repeated access
+  let cachedWindowHeight = window.innerHeight;
+  let cachedScrollY = window.scrollY;
 
   const controlledState = {
     playing: false,
@@ -36,12 +42,19 @@ export const Parallex = function(options = {}) {
 
   // Cache offset and speed
   // speed = the rate at which the parallax effect occurs relative to scroll. Determined via value
-  // on data attribute or defaults to 5. 
+  // on data attribute or defaults to 5.
   const speed = [];
-  // offset = the amount the element is in the viewport before the parallax effect starts to run. 
-  // This happens when activating parallax only if the element is in the viewport (by adding 
+  // offset = the amount the element is in the viewport before the parallax effect starts to run.
+  // This happens when activating parallax only if the element is in the viewport (by adding
   // 'parallax-active' class at a determined threshold - not handled by parallax code).
   const offset = [];
+
+  // Cache data attributes to avoid repeated DOM access
+  const constraints = [];
+  const explicitlyActivateFlags = [];
+  const isActiveFlags = [];
+  const isFrozenFlags = [];
+  const isInViewport = [];
 
   let supportsPassiveEvents = false;
 
@@ -55,26 +68,69 @@ export const Parallex = function(options = {}) {
     window.removeEventListener('testPassive', null, opts);
   } catch (e) {}
 
-  // Check which requestAnimationFrame to use. 
+  // Check which requestAnimationFrame to use.
   // If none supported - use the onscroll event
   const tick = window.requestAnimationFrame ||
   window.webkitRequestAnimationFrame ||
   window.mozRequestAnimationFrame ||
   window.msRequestAnimationFrame ||
   window.oRequestAnimationFrame ||
-  function(callback) { return window.setTimeout(callback, 1000 / 60); 
+  function(callback) { return window.setTimeout(callback, 1000 / 60);
   };
+
+  // Throttle helper function
+  function throttle(func, wait) {
+    let timeout;
+    let lastRan;
+    return function(...args) {
+      if (!lastRan) {
+        func.apply(this, args);
+        lastRan = Date.now();
+      } else {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          if ((Date.now() - lastRan) >= wait) {
+            func.apply(this, args);
+            lastRan = Date.now();
+          }
+        }, wait - (Date.now() - lastRan));
+      }
+    };
+  }
+
+  // Cache breakpoint keys and values to avoid recreating arrays
+  let breakpointKeys = null;
+  let breakpointValues = null;
+  let cachedBreakpoint = null;
+  let lastWindowWidth = window.innerWidth;
 
   function getBreakpoint() {
     if (!options.breakpoints) return false;
-    const keys = Object.keys(options.breakpoints);
-    const values = Object.values(options.breakpoints);
-    const bpVal = Math.max(...values.filter(val => val < window.innerWidth));
-    return keys[values.indexOf(bpVal)];
+
+    // Only recalculate if window width changed
+    if (window.innerWidth === lastWindowWidth && cachedBreakpoint !== null) {
+      return cachedBreakpoint;
+    }
+
+    lastWindowWidth = window.innerWidth;
+
+    // Cache keys and values on first call
+    if (!breakpointKeys) {
+      breakpointKeys = Object.keys(options.breakpoints);
+      breakpointValues = Object.values(options.breakpoints);
+    }
+
+    const bpVal = Math.max(...breakpointValues.filter(val => val < window.innerWidth));
+    cachedBreakpoint = breakpointKeys[breakpointValues.indexOf(bpVal)];
+    return cachedBreakpoint;
   };
       
+  // Pre-build static part of transform string
+  const TRANSFORM_STATIC = ' scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(0deg) skew(0deg, 0deg)';
+
   function getTransformStyle(offsetAmountX=0, offsetAmountY=0) {
-    return `translate3d(${offsetAmountX}px, ${offsetAmountY}px ,0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(0deg) skew(0deg, 0deg)`;
+    // Optimize: reduce string concatenation
+    return `translate3d(${offsetAmountX}px, ${offsetAmountY}px, 0px)${TRANSFORM_STATIC}`;
   };
 
   function setElementStyles(element) {
@@ -86,22 +142,29 @@ export const Parallex = function(options = {}) {
   };
 
   function setScrollDirection() {
-    scrollDirection = cachedScrollPosition > window.scrollY ? 'up' : 'down';
-    cachedScrollPosition = window.scrollY;
+    scrollDirection = cachedScrollPosition > cachedScrollY ? 'up' : 'down';
+    cachedScrollPosition = cachedScrollY;
   };
 
   function run(elements, trigger) {
-   
+
+    // Cache window dimensions once per frame instead of per element
+    cachedScrollY = window.scrollY;
+    cachedWindowHeight = window.innerHeight;
+
     setScrollDirection();
 
     elements.forEach((element, index) => {
 
-      const rect = element.getBoundingClientRect();
-      const isActive = element.classList.contains(options.activeClass);
-      let isFrozen = element.classList.contains(options.freezeClass);
+      // Only call getBoundingClientRect when necessary
+      let rect;
       const elementStyle = element.style;
-      const constraint = element.dataset.parallexConstraint || 10000;
-      const explicitlyActivate = element.dataset.parallexExplicitlyActivate || false;
+
+      // Use cached flags instead of classList.contains on every frame
+      const isActive = isActiveFlags[index];
+      let isFrozen = isFrozenFlags[index];
+      const constraint = constraints[index];
+      const explicitlyActivate = explicitlyActivateFlags[index];
 
       if (trigger === TRIGGERS.destroy) {
         element.style.removeProperty('transform');
@@ -138,18 +201,25 @@ export const Parallex = function(options = {}) {
       if (trigger === TRIGGERS.init) {
 
         setElementStyles(element);
-        
+
+        // Cache data attributes on init to avoid repeated DOM access
+        constraints[index] = parseInt(element.dataset.parallexConstraint) || 10000;
+        explicitlyActivateFlags[index] = element.dataset.parallexExplicitlyActivate === 'true';
+        isActiveFlags[index] = element.classList.contains(options.activeClass);
+        isFrozenFlags[index] = element.classList.contains(options.freezeClass);
+
         if (options.trigger === TRIGGERS.scroll) {
 
           offset[index] = 0;
 
           // If page loads with scroll position:
           // Freeze all parallax elements above viewport and then remove freeze when they have passed below the viewport
+          rect = element.getBoundingClientRect();
           if (rect.bottom < 0) {
-            isFrozen = true;
-            element.classList.add(options.freezeClass)
-            elementStyle.transform = getTransformStyle();  
-          } 
+            isFrozenFlags[index] = true;
+            element.classList.add(options.freezeClass);
+            elementStyle.transform = getTransformStyle();
+          }
         }
       }
 
@@ -159,41 +229,51 @@ export const Parallex = function(options = {}) {
 
         if (!isFrozen) {
 
-          const offsetAmount = window.scrollY * speed[index];
+          const offsetAmount = cachedScrollY * speed[index];
+
+          // Only call getBoundingClientRect when we need to check viewport position
+          // For explicitly activated elements, we don't need rect unless checking viewport
+          let needsViewportCheck = !explicitlyActivate;
+
+          if (needsViewportCheck) {
+            rect = element.getBoundingClientRect();
+          }
 
           // If item is active (has active class) or is in the viewport or above the viewport.
-          // Dont pause parallax when it is above viewport even if inactive as it needs to 
+          // Dont pause parallax when it is above viewport even if inactive as it needs to
           // retain its offset in order to renter the viewport at the correct position.
-          if ((explicitlyActivate && isActive) || (!explicitlyActivate && rect.top < window.innerHeight)) {
+          if ((explicitlyActivate && isActive) || (!explicitlyActivate && rect.top < cachedWindowHeight)) {
             const transformAmount = offsetAmount - offset[index];
 
             if (Math.abs(transformAmount) <= constraint) {
-              elementStyle.transform = getTransformStyle(undefined, transformAmount); 
+              elementStyle.transform = getTransformStyle(undefined, transformAmount);
             }
-          } 
+          }
           else {
             // Reset any transfrom that is scrolled out of view below the viewport.
             // Keep track of the offsetAmount when not active.
             offset[index] = offsetAmount;
-            elementStyle.transform = getTransformStyle(); 
+            elementStyle.transform = getTransformStyle();
           }
 
           // reset when reaches top of window
-          if (window.scrollY <= 0) {
+          if (cachedScrollY <= 0) {
             offset[index] = 0;
-            elementStyle.transform = getTransformStyle(); 
+            elementStyle.transform = getTransformStyle();
           }
         }
-        else if (isFrozen) { 
+        else if (isFrozen) {
           // Remove freeze classes when they have passed below the viewport
-          if (scrollDirection === 'up') { 
+          if (scrollDirection === 'up') {
+            rect = element.getBoundingClientRect();
 
-            if (rect.top > window.innerHeight || window.scrollY <= 0) {
-              element.classList.remove(options.freezeClass)
+            if (rect.top > cachedWindowHeight || cachedScrollY <= 0) {
+              element.classList.remove(options.freezeClass);
+              isFrozenFlags[index] = false;
               offset[index] = 0;
-              elementStyle.transform = getTransformStyle(); 
+              elementStyle.transform = getTransformStyle();
             }
-          } 
+          }
         }
       }
 
@@ -228,6 +308,10 @@ export const Parallex = function(options = {}) {
   };
 
   function reEvaluate() {
+    // Update cached window width for breakpoint calculation
+    lastWindowWidth = window.innerWidth;
+    cachedBreakpoint = null; // Force recalculation
+
     if (window.innerWidth > options.minActiveBreakpoint) {
       if (!isInitialised) {
         init(true);
@@ -240,6 +324,9 @@ export const Parallex = function(options = {}) {
       }
     }
   };
+
+  // Throttled version of reEvaluate for resize events
+  const throttledReEvaluate = throttle(reEvaluate, 150);
   
   function init(hasResizeEventListener=false) {
     parallexElements = (options.rootElement || document).querySelectorAll(options.selector);
@@ -264,16 +351,38 @@ export const Parallex = function(options = {}) {
       // Watch for resizing on either on window or root element
       if (!hasResizeEventListener) {
         if (options.rootElement) {
-          rootElementResizeObserver = new ResizeObserver(entries => {
-            entries.forEach(entry => {
-              reEvaluate();
-            })
+          rootElementResizeObserver = new ResizeObserver(() => {
+            throttledReEvaluate();
           })
           rootElementResizeObserver.observe(options.rootElement);
-        } 
-        else {
-          window.addEventListener('resize', reEvaluate);
         }
+        else {
+          window.addEventListener('resize', throttledReEvaluate);
+        }
+      }
+
+      // Setup Intersection Observer for viewport detection (optional optimization)
+      if (options.useIntersectionObserver && 'IntersectionObserver' in window) {
+        intersectionObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            const index = Array.from(parallexElements).indexOf(entry.target);
+            if (index !== -1) {
+              isInViewport[index] = entry.isIntersecting;
+              // Update active flag if element enters/exits viewport
+              if (entry.isIntersecting) {
+                isActiveFlags[index] = entry.target.classList.contains(options.activeClass);
+              }
+            }
+          });
+        }, {
+          rootMargin: '50px', // Start observing slightly before element enters viewport
+          threshold: 0
+        });
+
+        // Observe all parallax elements
+        parallexElements.forEach(element => {
+          intersectionObserver.observe(element);
+        });
       }
  
       // When refreshing a page that has been scrolled, the native browser behaviour is
@@ -338,12 +447,12 @@ export const Parallex = function(options = {}) {
   function destroy(retainResizeEventListener=false) {
     if (parallexElements && parallexElements.length > 0) {
       window.removeEventListener('scroll', runInsideRAF);
-      window.removeEventListener('scroll', reEvaluate);
+      window.removeEventListener('scroll', throttledReEvaluate);
 
       // if using minActiveBreakpoint option:
       // Retain on resize event listener to reactivate if screen size is increased
       if (!retainResizeEventListener) {
-        window.removeEventListener('resize', reEvaluate);
+        window.removeEventListener('resize', throttledReEvaluate);
 
         if (rootElementResizeObserver) {
           rootElementResizeObserver.disconnect();
@@ -351,7 +460,13 @@ export const Parallex = function(options = {}) {
       }
 
       if (options.rootElement) {
-        options.rootElement.removeEventListener('scroll', reEvaluate);
+        options.rootElement.removeEventListener('scroll', throttledReEvaluate);
+      }
+
+      // Disconnect Intersection Observer
+      if (intersectionObserver) {
+        intersectionObserver.disconnect();
+        intersectionObserver = null;
       }
 
       run(parallexElements, TRIGGERS.destroy);
