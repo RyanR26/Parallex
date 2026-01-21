@@ -15,9 +15,25 @@ A lightweight, performant JavaScript library for creating smooth parallax scroll
 
 ## Installation
 
+### Via npm
+
 ```bash
-npm install parallex
+npm install @ryanrudman/parallex
 ```
+
+### Via yarn
+
+```bash
+yarn add @ryanrudman/parallex
+```
+
+### Via pnpm
+
+```bash
+pnpm add @ryanrudman/parallex
+```
+
+### Direct import
 
 Or include directly in your project:
 
@@ -37,7 +53,7 @@ import { Parallex } from './parallex.js';
 ```
 
 ```javascript
-import { Parallex } from 'parallex';
+import { Parallex } from '@ryanrudman/parallex';
 
 // Initialize with default options
 const parallax = Parallex();

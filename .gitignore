@@ -1,5 +1,8 @@
 # Project specific
 OPTIMIZATIONS.md
+PUBLISHING.md
+NPM_MODULE_SUMMARY.md
+*.tgz
 
 # Dependencies
 node_modules/
